@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>訂單資料查詢</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 48px 20px;
+    }
+
+    .container {
+      max-width: 1050px;
+      margin: 0 auto;
+    }
+
+    .search-card,
+    .result-card {
+      background: #ffffff;
+      border-radius: 18px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+    }
+
+    .search-card {
+      padding: 36px;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 28px;
+      text-align: center;
+      font-size: 34px;
+      letter-spacing: 1px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    select,
+    input {
+      flex: 1;
+      padding: 16px 18px;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      font-size: 18px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    select:focus,
+    input:focus {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+    }
+
+    button {
+      min-width: 140px;
+      padding: 0 28px;
+      border: 0;
+      border-radius: 12px;
+      background: #4f46e5;
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(79, 70, 229, 0.24);
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .message {
+      margin-top: 20px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      display: none;
+      font-weight: 700;
+    }
+
+    .message.success {
+      display: block;
+      color: #166534;
+      background: #dcfce7;
+    }
+
+    .message.error {
+      display: block;
+      color: #991b1b;
+      background: #fee2e2;
+    }
+
+    .message.info {
+      display: block;
+      color: #1e40af;
+      background: #dbeafe;
+    }
+
+    .result-title {
+      padding: 22px 28px;
+      font-size: 24px;
+      font-weight: 800;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 780px;
+    }
+
+    th,
+    td {
+      padding: 18px 20px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f9fafb;
+      color: #4b5563;
+      font-size: 15px;
+    }
+
+    td {
+      font-size: 16px;
+      color: #374151;
+    }
+
+    .empty {
+      padding: 28px;
+      color: #6b7280;
+    }
+
+    @media (max-width: 700px) {
+      .page {
+        padding: 24px 12px;
+      }
+
+      .search-card {
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .form-row {
+        flex-direction: column;
+      }
+
+      button {
+        height: 52px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="container">
+      <section class="search-card">
+        <h1>訂單資料查詢</h1>
+
+        <div class="form-row">
+          <select id="searchType" aria-label="查詢條件">
+            <option value="會員姓名">會員姓名</option>
+            <option value="會員 ID">會員 ID</option>
+            <option value="訂單編號">訂單編號</option>
+            <option value="購買商品">購買商品</option>
+          </select>
+          <input id="keywordInput" type="text" placeholder="請輸入查詢內容，例如：曾國城 / M002 / ORD-20240428-002 / 香菸" autocomplete="off" />
+          <button id="searchBtn" type="button">查詢</button>
+        </div>
+
+        <div id="message" class="message"></div>
+      </section>
+
+      <section class="result-card">
+        <div class="result-title">查詢結果</div>
+        <div id="resultArea" class="table-wrap">
+          <div class="empty">尚未查詢資料</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const webhookUrl = "https://6oucrthj.roamerhost.com/webhook/98c8e970-4c4e-4029-b7a8-af7348ef3a60";
+
+    const searchType = document.getElementById("searchType");
+    const keywordInput = document.getElementById("keywordInput");
+    const searchBtn = document.getElementById("searchBtn");
+    const message = document.getElementById("message");
+    const resultArea = document.getElementById("resultArea");
+
+    function showMessage(type, text) {
+      message.className = "message " + type;
+      message.textContent = text;
+    }
+
+    function clearMessage() {
+      message.className = "message";
+      message.textContent = "";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function normalizeRows(data) {
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.data)) return data.data;
+      if (data && typeof data === "object") return [data];
+      return [];
+    }
+
+    function renderTable(data) {
+      const rows = normalizeRows(data);
+
+      if (rows.length === 0) {
+        resultArea.innerHTML = '<div class="empty">查無資料</div>';
+        return;
+      }
+
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>訂單編號</th>
+              <th>會員 ID</th>
+              <th>會員姓名</th>
+              <th>購買商品</th>
+              <th>購買金額</th>
+              <th>交易時間</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      rows.forEach(row => {
+        html += `
+          <tr>
+            <td>${escapeHtml(row["訂單編號"])}</td>
+            <td>${escapeHtml(row["會員 ID"])}</td>
+            <td>${escapeHtml(row["會員姓名"])}</td>
+            <td>${escapeHtml(row["購買商品"])}</td>
+            <td>$${escapeHtml(row["購買金額"])}</td>
+            <td>${escapeHtml(row["交易時間"])}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      resultArea.innerHTML = html;
+    }
+
+    async function searchOrder() {
+      const type = searchType.value;
+      const keyword = keywordInput.value.trim();
+      clearMessage();
+
+      if (!keyword) {
+        showMessage("error", "請先輸入查詢內容");
+        return;
+      }
+
+      const postData = {
+        [type]: keyword
+      };
+
+      try {
+        searchBtn.disabled = true;
+        searchBtn.textContent = "查詢中...";
+        showMessage("info", "正在查詢資料，請稍候...");
+
+        const response = await fetch(webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(postData)
+        });
+
+        if (!response.ok) {
+          throw new Error("Webhook 回應錯誤，狀態碼：" + response.status);
+        }
+
+        const data = await response.json();
+        showMessage("success", "查詢成功！");
+        renderTable(data);
+      } catch (error) {
+        showMessage("error", "查詢失敗：" + error.message);
+        resultArea.innerHTML = '<div class="empty">沒有可顯示的資料</div>';
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.textContent = "查詢";
+      }
+    }
+
+    searchBtn.addEventListener("click", searchOrder);
+
+    keywordInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        searchOrder();
+      }
+    });
+  </script>
+</body>
+</html>
